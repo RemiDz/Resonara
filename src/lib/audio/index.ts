@@ -27,3 +27,6 @@ export type { NoiseFloorResult } from "./noiseFloor";
 
 export { detectTransients, extractImpulseResponse } from "./transientDetector";
 export type { TransientEvent, TransientDetectorConfig } from "./transientDetector";
+
+export { frequencyToNote, noteToFrequency } from "./noteMapper";
+export type { NoteInfo } from "./noteMapper";

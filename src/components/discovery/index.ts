@@ -4,3 +4,5 @@ export { AmbientListen } from "./AmbientListen";
 export { ClapTest } from "./ClapTest";
 export { SpatialWalk } from "./SpatialWalk";
 export { InstrumentProfiler } from "./InstrumentProfiler";
+export { InstrumentProfileCard } from "./InstrumentProfileCard";
+export { EnergyCentreMap } from "./EnergyCentreMap";

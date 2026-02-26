@@ -12,12 +12,14 @@ import { ScoreDisplay } from "@/components/ui/ScoreDisplay";
 import { MandalaCanvas } from "@/components/visualisations/MandalaCanvas";
 import type { NoiseFloorResult } from "@/lib/audio/noiseFloor";
 import type { ImpulseCaptureResult } from "@/hooks/useImpulseCapture";
+import type { InstrumentProfile } from "@/lib/analysis/compatibilityScorer";
 
 type Step = "opening" | "ambient" | "clap" | "spatial" | "instruments" | "summary";
 
 interface DiscoveryData {
   noiseFloor: NoiseFloorResult | null;
   clapResults: ImpulseCaptureResult[];
+  instrumentProfiles: InstrumentProfile[];
 }
 
 const STEP_ORDER: Step[] = ["opening", "ambient", "clap", "spatial", "instruments", "summary"];
@@ -30,6 +32,7 @@ export function DiscoveryStepper() {
   const [data, setData] = useState<DiscoveryData>({
     noiseFloor: null,
     clapResults: [],
+    instrumentProfiles: [],
   });
 
   const stepIndex = STEP_ORDER.indexOf(currentStep);
@@ -48,6 +51,11 @@ export function DiscoveryStepper() {
   const handleClapComplete = useCallback((results: ImpulseCaptureResult[]) => {
     setData((prev) => ({ ...prev, clapResults: results }));
     setCurrentStep("spatial");
+  }, []);
+
+  const handleInstrumentsComplete = useCallback((instrumentProfiles: InstrumentProfile[]) => {
+    setData((prev) => ({ ...prev, instrumentProfiles }));
+    setCurrentStep("summary");
   }, []);
 
   // Compute overall room score
@@ -127,8 +135,9 @@ export function DiscoveryStepper() {
 
       {currentStep === "instruments" && (
         <InstrumentProfiler
-          onComplete={() => setCurrentStep("summary")}
+          onComplete={handleInstrumentsComplete}
           onBack={goBack}
+          noiseFloor={data.noiseFloor}
         />
       )}
 
@@ -169,6 +178,14 @@ export function DiscoveryStepper() {
                         data.clapResults.length
                       ).toFixed(2)}
                       s
+                    </p>
+                  </div>
+                )}
+                {data.instrumentProfiles.length > 0 && (
+                  <div className="glass rounded-lg p-3">
+                    <p className="text-xs text-foreground-muted">Instruments</p>
+                    <p className="text-sm font-bold text-gold">
+                      {data.instrumentProfiles.length} profiled
                     </p>
                   </div>
                 )}
