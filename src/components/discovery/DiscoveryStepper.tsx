@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { OpeningScreen } from "./OpeningScreen";
 import { AmbientListen } from "./AmbientListen";
 import { ClapTest } from "./ClapTest";
@@ -10,9 +11,12 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { ScoreDisplay } from "@/components/ui/ScoreDisplay";
 import { MandalaCanvas } from "@/components/visualisations/MandalaCanvas";
+import { saveRoom } from "@/lib/data/db";
 import type { NoiseFloorResult } from "@/lib/audio/noiseFloor";
 import type { ImpulseCaptureResult } from "@/hooks/useImpulseCapture";
 import type { InstrumentProfile } from "@/lib/analysis/compatibilityScorer";
+import type { EnergyCentreKey } from "@/hooks/useFFT";
+import type { SerializedClapResult, SerializedInstrumentProfile } from "@/lib/data/db";
 
 type Step = "opening" | "ambient" | "clap" | "spatial" | "instruments" | "summary";
 
@@ -27,8 +31,14 @@ const STEP_ORDER: Step[] = ["opening", "ambient", "clap", "spatial", "instrument
 /**
  * Orchestrates the Room Discovery flow through all phases.
  */
+const ENERGY_CENTRE_KEYS: EnergyCentreKey[] = [
+  "root", "sacral", "solarPlexus", "heart", "throat", "thirdEye", "crown",
+];
+
 export function DiscoveryStepper() {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState<Step>("opening");
+  const [isSaving, setIsSaving] = useState(false);
   const [data, setData] = useState<DiscoveryData>({
     noiseFloor: null,
     clapResults: [],
@@ -84,6 +94,47 @@ export function DiscoveryStepper() {
     }
 
     return Math.max(0, Math.min(100, Math.round(score)));
+  };
+
+  const handleViewProfile = async () => {
+    setIsSaving(true);
+    try {
+      // Serialise clap results (Float32Array → number[])
+      const clapResults: SerializedClapResult[] = data.clapResults.map((r) => ({
+        rt60: r.rt60.rt60,
+        decayCurve: Array.from(r.rt60.decayCurve),
+        quality: r.rt60.quality,
+        peakAmplitude: r.transient.peakAmplitude,
+        timeSeconds: r.transient.timeSeconds,
+      }));
+
+      // Serialise instrument profiles (Float32Array → number[])
+      const instrumentProfiles: SerializedInstrumentProfile[] =
+        data.instrumentProfiles.map((p) => ({
+          ...p,
+          averagedSpectrum: Array.from(p.averagedSpectrum),
+        }));
+
+      // Compute energy centres from noise floor band levels
+      const energyCentres = {} as Record<EnergyCentreKey, number>;
+      for (const key of ENERGY_CENTRE_KEYS) {
+        energyCentres[key] = data.noiseFloor?.bandLevels[key] ?? -60;
+      }
+
+      const id = await saveRoom({
+        name: `Room ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
+        createdAt: Date.now(),
+        overallScore: computeOverallScore(),
+        noiseFloor: data.noiseFloor,
+        clapResults,
+        instrumentProfiles,
+        energyCentres,
+      });
+
+      router.push(`/dashboard?roomId=${id}`);
+    } catch {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -197,13 +248,22 @@ export function DiscoveryStepper() {
               with additional measurements.
             </p>
 
-            <GoldButton
-              onClick={() => setCurrentStep("opening")}
-              variant="secondary"
-              className="w-full"
-            >
-              Discover Another Room
-            </GoldButton>
+            <div className="flex flex-col gap-3">
+              <GoldButton
+                onClick={handleViewProfile}
+                disabled={isSaving}
+                className="w-full"
+              >
+                {isSaving ? "Saving\u2026" : "View Room Profile"}
+              </GoldButton>
+              <GoldButton
+                onClick={() => setCurrentStep("opening")}
+                variant="secondary"
+                className="w-full"
+              >
+                Discover Another Room
+              </GoldButton>
+            </div>
           </GlassPanel>
         </div>
       )}
