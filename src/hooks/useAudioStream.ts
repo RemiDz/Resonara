@@ -46,6 +46,13 @@ export function useAudioStream(): UseAudioStreamReturn {
       const stream = await getMicrophoneStream();
       streamRef.current = stream;
 
+      // Belt-and-braces: re-check AudioContext state after mic grant
+      // iOS Safari can sometimes re-suspend during the getUserMedia flow
+      const audioCtx = getAudioContext();
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+
       // Create source node
       const source = createMicSource(stream);
       sourceRef.current = source;

@@ -17,6 +17,8 @@ export interface TransientEvent {
 export interface TransientDetectorConfig {
   /** Threshold in dB above noise floor to trigger detection. */
   thresholdDB: number;
+  /** Minimum peak amplitude (0–1) to qualify as a transient. */
+  minAmplitude: number;
   /** Minimum time (seconds) between detected transients. */
   minIntervalSeconds: number;
   /** Analysis window size in samples. */
@@ -24,7 +26,8 @@ export interface TransientDetectorConfig {
 }
 
 const DEFAULT_CONFIG: TransientDetectorConfig = {
-  thresholdDB: 12,
+  thresholdDB: 6,
+  minAmplitude: 0.1,
   minIntervalSeconds: 0.3,
   windowSize: 512,
 };
@@ -37,7 +40,7 @@ export function detectTransients(
   sampleRate: number,
   config: Partial<TransientDetectorConfig> = {}
 ): TransientEvent[] {
-  const { thresholdDB, minIntervalSeconds, windowSize } = {
+  const { thresholdDB, minAmplitude, minIntervalSeconds, windowSize } = {
     ...DEFAULT_CONFIG,
     ...config,
   };
@@ -81,6 +84,9 @@ export function detectTransients(
         const abs = Math.abs(buffer[sampleIndex + i]);
         if (abs > peak) peak = abs;
       }
+
+      // Amplitude gate — ignore quiet noise spikes
+      if (peak < minAmplitude) continue;
 
       events.push({
         sampleIndex,

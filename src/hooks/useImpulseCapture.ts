@@ -17,6 +17,8 @@ export interface UseImpulseCaptureReturn {
   isRecording: boolean;
   results: ImpulseCaptureResult[];
   error: string | null;
+  /** Current peak amplitude (0–1) — updates in real-time during recording. */
+  currentPeak: number;
   /** Start recording from a source node. Listens for transients. */
   startCapture: (source: AudioNode) => void;
   /** Stop recording and process captured audio. */
@@ -34,6 +36,7 @@ export function useImpulseCapture(): UseImpulseCaptureReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [results, setResults] = useState<ImpulseCaptureResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [currentPeak, setCurrentPeak] = useState(0);
 
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const bufferRef = useRef<Float32Array[]>([]);
@@ -52,6 +55,14 @@ export function useImpulseCapture(): UseImpulseCaptureReturn {
     processor.onaudioprocess = (event) => {
       const input = event.inputBuffer.getChannelData(0);
       bufferRef.current.push(new Float32Array(input));
+
+      // Track peak amplitude for real-time UI feedback
+      let peak = 0;
+      for (let i = 0; i < input.length; i++) {
+        const abs = Math.abs(input[i]);
+        if (abs > peak) peak = abs;
+      }
+      setCurrentPeak(peak);
     };
 
     source.connect(processor);
@@ -61,6 +72,7 @@ export function useImpulseCapture(): UseImpulseCaptureReturn {
 
   const stopCapture = useCallback(async (): Promise<ImpulseCaptureResult[]> => {
     setIsRecording(false);
+    setCurrentPeak(0);
 
     if (processorRef.current) {
       processorRef.current.disconnect();
@@ -120,6 +132,7 @@ export function useImpulseCapture(): UseImpulseCaptureReturn {
     isRecording,
     results,
     error,
+    currentPeak,
     startCapture,
     stopCapture,
     reset,

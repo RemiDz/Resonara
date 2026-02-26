@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { ScoreDisplay } from "@/components/ui/ScoreDisplay";
@@ -8,6 +8,7 @@ import { MandalaCanvas } from "@/components/visualisations/MandalaCanvas";
 import { useAudioStream } from "@/hooks/useAudioStream";
 import { useFFT } from "@/hooks/useFFT";
 import { useImpulseCapture } from "@/hooks/useImpulseCapture";
+import { getAudioContext } from "@/lib/audio/audioContext";
 import type { ImpulseCaptureResult } from "@/hooks/useImpulseCapture";
 
 interface ClapTestProps {
@@ -20,6 +21,29 @@ export function ClapTest({ onComplete, onBack }: ClapTestProps) {
   const fft = useFFT();
   const impulseCapture = useImpulseCapture();
   const [phase, setPhase] = useState<"idle" | "recording" | "done">("idle");
+  const [ctxState, setCtxState] = useState<string>("—");
+  const ctxPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Poll AudioContext state for debug overlay
+  useEffect(() => {
+    if (phase === "recording") {
+      const poll = setInterval(() => {
+        try {
+          setCtxState(getAudioContext().state);
+        } catch {
+          setCtxState("error");
+        }
+      }, 500);
+      ctxPollRef.current = poll;
+      return () => clearInterval(poll);
+    } else {
+      if (ctxPollRef.current) {
+        clearInterval(ctxPollRef.current);
+        ctxPollRef.current = null;
+      }
+      setCtxState("—");
+    }
+  }, [phase]);
 
   const startRecording = useCallback(async () => {
     const source = await audioStream.start();
@@ -97,6 +121,50 @@ export function ClapTest({ onComplete, onBack }: ClapTestProps) {
             <p className="mb-4 text-foreground-muted">
               Recording... Clap now!
             </p>
+
+            {/* Real-time mic level indicator */}
+            <div className="mb-3 w-full">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs text-foreground-muted">Mic Level</span>
+                <div className="flex-1 h-3 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-75"
+                    style={{
+                      width: `${Math.min(impulseCapture.currentPeak * 100, 100)}%`,
+                      backgroundColor:
+                        impulseCapture.currentPeak > 0.5
+                          ? "#D4A843"
+                          : impulseCapture.currentPeak > 0.1
+                            ? "#9B5BD4"
+                            : "#4B3B6B",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Debug overlay */}
+            <div className="mb-4 rounded-lg bg-black/40 px-3 py-2 font-mono text-xs text-foreground-muted text-left">
+              <div className="flex justify-between">
+                <span>Peak amplitude:</span>
+                <span className={impulseCapture.currentPeak > 0.1 ? "text-gold" : ""}>
+                  {impulseCapture.currentPeak.toFixed(4)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Audio flowing:</span>
+                <span className={impulseCapture.currentPeak > 0.001 ? "text-green-400" : "text-red-400"}>
+                  {impulseCapture.currentPeak > 0.001 ? "yes" : "no"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>AudioContext:</span>
+                <span className={ctxState === "running" ? "text-green-400" : "text-red-400"}>
+                  {ctxState}
+                </span>
+              </div>
+            </div>
+
             <div className="mb-4 flex items-center justify-center gap-2">
               <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
               <span className="text-sm text-foreground-muted">
