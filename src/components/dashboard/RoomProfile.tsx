@@ -172,7 +172,14 @@ export function RoomProfile({ roomId }: RoomProfileProps) {
           <InstrumentShelf profiles={room.instrumentProfiles} />
         )}
 
-        {/* 7. Navigation */}
+        {/* 7. Prepare Session */}
+        <div className="flex justify-center">
+          <Link href={`/session?roomId=${roomId}`}>
+            <GoldButton>Prepare Session</GoldButton>
+          </Link>
+        </div>
+
+        {/* 8. Navigation */}
         <div className="flex justify-center pt-4 pb-8">
           <Link href="/">
             <GoldButton variant="secondary">Discover Another Room</GoldButton>

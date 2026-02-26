@@ -111,3 +111,10 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(212, 168, 67, 0.5);
 }
+
+/* Print styles for session export */
+@media print {
+  body { background: white !important; color: black !important; }
+  .glass { background: white !important; border: 1px solid #ccc !important; backdrop-filter: none !important; }
+  .no-print { display: none !important; }
+}

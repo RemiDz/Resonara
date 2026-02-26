@@ -147,3 +147,64 @@ export async function deleteRoom(id: string): Promise<void> {
   const db = await getDB();
   await db.delete("rooms", id);
 }
+
+// ---------------------------------------------------------------------------
+// Session types (fits existing `sessions` store without schema change)
+// ---------------------------------------------------------------------------
+
+export interface SessionSnapshot {
+  time: number; // seconds from session start
+  centres: Record<EnergyCentreKey, number>;
+}
+
+export interface SessionData {
+  intention: string;
+  startedAt: number;
+  durationSeconds: number;
+  snapshots: SessionSnapshot[];
+  peakMoments: Array<{ time: number; totalEnergy: number; peakCentre: EnergyCentreKey }>;
+  averageCentres: Record<EnergyCentreKey, number>;
+  qualityScore: number;
+}
+
+export interface SessionRecord {
+  id: string;
+  roomId: string;
+  createdAt: number;
+  data: SessionData;
+}
+
+// ---------------------------------------------------------------------------
+// Session CRUD
+// ---------------------------------------------------------------------------
+
+/**
+ * Save a session record. Returns the generated id.
+ */
+export async function saveSession(
+  session: Omit<SessionRecord, "id">,
+): Promise<string> {
+  const db = await getDB();
+  const id = generateId();
+  const record = { ...session, id } as SessionRecord;
+  await db.put("sessions", record as unknown as ResonaraDB["sessions"]["value"]);
+  return id;
+}
+
+/**
+ * Retrieve a single session by id.
+ */
+export async function getSession(id: string): Promise<SessionRecord | undefined> {
+  const db = await getDB();
+  const raw = await db.get("sessions", id);
+  return raw as unknown as SessionRecord | undefined;
+}
+
+/**
+ * Retrieve all sessions for a room, newest first.
+ */
+export async function getSessionsByRoom(roomId: string): Promise<SessionRecord[]> {
+  const db = await getDB();
+  const all = await db.getAllFromIndex("sessions", "by-roomId", roomId);
+  return (all as unknown as SessionRecord[]).reverse();
+}
